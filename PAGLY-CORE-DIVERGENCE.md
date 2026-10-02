@@ -2,7 +2,7 @@
 
 Every Pagly edit to a file that came from upstream Medusa is recorded here.
 
-`develop` stays a clean mirror of [medusajs/medusa](https://github.com/medusajs/medusa). Pagly edits live on the long-lived `pagly` branch, which started at tag `v2.21.2`. Package names stay `@medusajs/*` and the upstream layout stays intact so a release merge stays a merge.
+Pagly's core edits are on `develop`, which started from tag `v2.21.2` and now also carries those edits. Package names stay `@medusajs/*` and the upstream layout stays intact so a release merge stays a merge.
 
 ## When to add an entry
 
@@ -39,10 +39,8 @@ Leave a one-line marker at the edit site:
 
 ```bash
 git fetch upstream --tags
-git checkout pagly
+git checkout develop
 git merge vX.Y.Z
 ```
 
-Review this ledger while resolving conflicts. Then push `pagly` and bump the `medusa-core` submodule in `pagly-backoffice`.
-
-Do not merge Pagly edits into `develop`. `develop` tracks upstream `develop` only.
+Review this ledger while resolving conflicts. Then push `develop` and bump the `medusa-core` submodule in `pagly-backoffice`.
