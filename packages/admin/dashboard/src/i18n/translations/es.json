@@ -120,6 +120,10 @@
         "key": "Clave",
         "value": "Valor"
       },
+      "other": {
+        "label": "Otros metadatos",
+        "description": "Claves para las que la tienda no definió un metacampo. Lo que escribas acá se guarda tal cual."
+      },
       "complexRow": {
         "label": "Algunas filas están deshabilitadas",
         "description": "Este objeto contiene metadatos no primitivos, como arreglos u objetos, que no se pueden editar aquí. Para editar las filas deshabilitadas, usa la API directamente.",
@@ -3827,5 +3831,8 @@
         "cancelText": "Cancelar"
       }
     }
+  },
+  "onlineStore": {
+    "domain": "Tienda online"
   }
 }

@@ -434,6 +434,19 @@
               "required": ["key", "value"],
               "additionalProperties": false
             },
+            "other": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": ["label", "description"],
+              "additionalProperties": false
+            },
             "complexRow": {
               "type": "object",
               "properties": {
@@ -457,6 +470,7 @@
             "successToast",
             "actions",
             "labels",
+            "other",
             "complexRow"
           ],
           "additionalProperties": false
@@ -14686,6 +14700,16 @@
         "actions"
       ],
       "additionalProperties": false
+    },
+    "onlineStore": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        }
+      },
+      "required": ["domain"],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -14752,7 +14776,8 @@
     "dateTime",
     "views",
     "auth",
-    "permissions"
+    "permissions",
+    "onlineStore"
   ],
   "additionalProperties": false
 }
