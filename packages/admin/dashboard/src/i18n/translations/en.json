@@ -98,6 +98,10 @@
         "key": "Key",
         "value": "Value"
       },
+      "other": {
+        "label": "Other metadata",
+        "description": "Keys the store has not defined a metafield for. Anything entered here is stored as typed."
+      },
       "complexRow": {
         "label": "Some rows are disabled",
         "description": "This object contains non-primitive metadata, such as arrays or objects, that can't be edited here. To edit the disabled rows, use the API directly.",
@@ -3810,5 +3814,8 @@
       "update": "Edit",
       "delete": "Delete"
     }
+  },
+  "onlineStore": {
+    "domain": "Online store"
   }
 }

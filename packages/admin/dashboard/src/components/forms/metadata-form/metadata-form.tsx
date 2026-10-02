@@ -5,6 +5,10 @@ import {
   Heading,
   IconButton,
   InlineTip,
+  Input,
+  Switch,
+  Text,
+  Textarea,
   clx,
   toast,
 } from "@medusajs/ui"
@@ -32,11 +36,37 @@ type MetaDataSubmitHook<TRes> = (
   callbacks: { onSuccess: () => void; onError: (error: FetchError) => void }
 ) => Promise<TRes>
 
+/**
+ * Pagly: a metafield definition the caller wants rendered as a typed input.
+ * Kept local so core does not depend on a Pagly module type. Callers pass
+ * objects that match this shape; `json` stays in the key/value grid.
+ */
+export type MetadataDefinition = {
+  id: string
+  key: string
+  name: string
+  description?: string | null
+  type:
+    | "text"
+    | "multiline_text"
+    | "number"
+    | "boolean"
+    | "url"
+    | "date"
+    | "json"
+}
+
 type MetadataFormProps<TRes> = {
   metadata?: Record<string, any> | null
   hook: MetaDataSubmitHook<TRes>
   isPending: boolean
   isMutating: boolean
+  /**
+   * Pagly: each definition is lifted out of the key/value grid and given an
+   * input that matches its type. Anything without a definition stays in the
+   * grid. Omit it and the form behaves exactly as before.
+   */
+  definitions?: MetadataDefinition[]
 }
 
 const MetadataFieldSchema = z.object({
@@ -45,7 +75,13 @@ const MetadataFieldSchema = z.object({
   value: z.any(),
 })
 
+const DefinedFieldSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+})
+
 const MetadataSchema = z.object({
+  defined: z.array(DefinedFieldSchema),
   metadata: z.array(MetadataFieldSchema),
 })
 
@@ -75,21 +111,24 @@ const InnerForm = <TRes,>({
   metadata,
   hook,
   isMutating,
+  definitions,
 }: Omit<MetadataFormProps<TRes>, "isPending">) => {
   const { t } = useTranslation()
   const { handleSuccess } = useRouteModal()
   const direction = useDocumentDirection()
-  const hasUneditableRows = getHasUneditableRows(metadata)
+  const defined = definedFields(definitions)
+  const hasUneditableRows = getHasUneditableRows(metadata, defined)
 
   const form = useForm<z.infer<typeof MetadataSchema>>({
     defaultValues: {
-      metadata: getDefaultValues(metadata),
+      defined: getDefinedValues(metadata, defined),
+      metadata: getDefaultValues(metadata, defined),
     },
     resolver: zodResolver(MetadataSchema),
   })
 
   const handleSubmit = form.handleSubmit(async (data) => {
-    const parsedData = parseValues(data, metadata)
+    const parsedData = parseValues(data, metadata, defined)
 
     await hook(
       {
@@ -148,6 +187,41 @@ const InnerForm = <TRes,>({
         className="flex flex-1 flex-col overflow-hidden"
       >
         <RouteDrawer.Body className="flex flex-1 flex-col gap-y-8 overflow-y-auto">
+          {defined.length > 0 && (
+            <div className="flex flex-col gap-y-6">
+              {defined.map((definition, index) => (
+                <Form.Field
+                  key={definition.id}
+                  control={form.control}
+                  name={`defined.${index}.value`}
+                  render={({ field }) => (
+                    <Form.Item>
+                      <Form.Label>{definition.name}</Form.Label>
+                      {definition.description && (
+                        <Form.Hint>{definition.description}</Form.Hint>
+                      )}
+                      <Form.Control>
+                        <DefinedInput type={definition.type} {...field} />
+                      </Form.Control>
+                      <Form.ErrorMessage />
+                    </Form.Item>
+                  )}
+                />
+              ))}
+              <div className="flex flex-col gap-y-1">
+                <Text size="small" weight="plus" leading="compact">
+                  {t("metadata.edit.other.label")}
+                </Text>
+                <Text
+                  size="small"
+                  leading="compact"
+                  className="text-ui-fg-subtle"
+                >
+                  {t("metadata.edit.other.description")}
+                </Text>
+              </div>
+            </div>
+          )}
           <div className="bg-ui-bg-base shadow-elevation-card-rest grid grid-cols-1 divide-y rounded-lg">
             <div className="bg-ui-bg-subtle grid grid-cols-2 divide-x rounded-t-lg">
               <div className="txt-compact-small-plus text-ui-fg-subtle px-2 py-1.5">
@@ -310,6 +384,61 @@ const InnerForm = <TRes,>({
   )
 }
 
+type DefinedType = MetadataDefinition["type"]
+
+/**
+ * The input a defined metafield gets, chosen by its type.
+ *
+ * Every value still travels as a string, because that is what the form holds
+ * and what the grid below would hold; `parseValues` is the one place that turns
+ * it into the number, boolean or text that goes into metadata.
+ */
+const DefinedInput = forwardRef<
+  HTMLInputElement,
+  {
+    type: DefinedType
+    value: string
+    onChange: (value: string) => void
+    onBlur: () => void
+    name: string
+  }
+>(({ type, value, onChange, ...props }, ref) => {
+  if (type === "multiline_text") {
+    return (
+      <Textarea
+        {...props}
+        rows={3}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    )
+  }
+
+  if (type === "boolean") {
+    return (
+      <div className="flex items-center">
+        <Switch
+          {...props}
+          checked={value === "true"}
+          onCheckedChange={(checked) => onChange(checked ? "true" : "false")}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <Input
+      {...props}
+      ref={ref}
+      type={type === "number" ? "number" : type === "date" ? "date" : "text"}
+      inputMode={type === "number" ? "decimal" : undefined}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  )
+})
+DefinedInput.displayName = "MetadataForm.DefinedInput"
+
 const GridInput = forwardRef<
   HTMLInputElement,
   ComponentPropsWithoutRef<"input">
@@ -346,9 +475,47 @@ const PlaceholderInner = () => {
 
 const EDITABLE_TYPES = ["string", "number", "boolean"]
 
+/**
+ * A `json` metafield holds a structure no single input can edit, so it is left
+ * to the grid, where it shows as an uneditable row the way any other object
+ * value does.
+ */
+function definedFields(
+  definitions?: MetadataDefinition[]
+): MetadataDefinition[] {
+  return (definitions ?? []).filter((definition) => definition.type !== "json")
+}
+
+function getDefinedValues(
+  metadata: Record<string, any> | null | undefined,
+  defined: MetadataDefinition[]
+): z.infer<typeof DefinedFieldSchema>[] {
+  return defined.map((definition) => {
+    const value = metadata?.[definition.key]
+
+    return {
+      key: definition.key,
+      value:
+        value === undefined || value === null || typeof value === "object"
+          ? definition.type === "boolean"
+            ? "false"
+            : ""
+          : String(value),
+    }
+  })
+}
+
 function getDefaultValues(
-  metadata?: Record<string, any> | null
+  metadata?: Record<string, any> | null,
+  defined: MetadataDefinition[] = []
 ): z.infer<typeof MetadataFieldSchema>[] {
+  const claimed = new Set(defined.map((definition) => definition.key))
+  metadata = metadata
+    ? Object.fromEntries(
+        Object.entries(metadata).filter(([key]) => !claimed.has(key))
+      )
+    : metadata
+
   if (!metadata || !Object.keys(metadata).length) {
     return [
       {
@@ -384,13 +551,15 @@ function getDefaultValues(
 
 function parseValues(
   values: z.infer<typeof MetadataSchema>,
-  original?: Record<string, any> | null
+  original?: Record<string, any> | null,
+  defined: MetadataDefinition[] = []
 ): Record<string, any> | null {
   const metadata = values.metadata
 
   const isEmpty =
-    !metadata.length ||
-    (metadata.length === 1 && !metadata[0].key && !metadata[0].value)
+    !defined.length &&
+    (!metadata.length ||
+      (metadata.length === 1 && !metadata[0].key && !metadata[0].value))
 
   if (isEmpty) {
     return null
@@ -400,13 +569,24 @@ function parseValues(
 
   // First, handle removed keys from original
   if (original) {
+    const kept = new Set([
+      ...metadata.map((field) => field.key),
+      ...defined.map((definition) => definition.key),
+    ])
+
     Object.keys(original).forEach((originalKey) => {
-      const exists = metadata.some((field) => field.key === originalKey)
-      if (!exists) {
+      if (!kept.has(originalKey)) {
         update[originalKey] = ""
       }
     })
   }
+
+  defined.forEach((definition, index) => {
+    update[definition.key] = definedValue(
+      definition.type,
+      values.defined[index]?.value ?? ""
+    )
+  })
 
   metadata.forEach((field) => {
     let key = field.key
@@ -443,12 +623,43 @@ function parseValues(
   return update
 }
 
-function getHasUneditableRows(metadata?: Record<string, any> | null) {
+/**
+ * A defined metafield's typed value, or `""` to clear it.
+ *
+ * Clearing is an empty string rather than a missing key because that is how
+ * this form has always removed a value.
+ */
+function definedValue(type: DefinedType, raw: string): any {
+  const value = raw.trim()
+
+  if (type === "boolean") {
+    return value === "true"
+  }
+
+  if (!value) {
+    return ""
+  }
+
+  if (type === "number") {
+    const parsed = parseFloat(value)
+    return Number.isFinite(parsed) ? parsed : ""
+  }
+
+  return value
+}
+
+function getHasUneditableRows(
+  metadata?: Record<string, any> | null,
+  defined: MetadataDefinition[] = []
+) {
   if (!metadata) {
     return false
   }
 
-  return Object.values(metadata).some(
-    (value) => !EDITABLE_TYPES.includes(typeof value)
+  const claimed = new Set(defined.map((definition) => definition.key))
+
+  return Object.entries(metadata).some(
+    ([key, value]) =>
+      !claimed.has(key) && !EDITABLE_TYPES.includes(typeof value)
   )
 }
