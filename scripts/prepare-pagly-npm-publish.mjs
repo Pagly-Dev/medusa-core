@@ -1,24 +1,17 @@
 /**
- * Rewrites the current checkout so it publishes as @pagly/* on npm.
+ * Rewrites only the packages listed in pagly-publish-packages.mjs so they
+ * publish as @pagly/*. Other @medusajs/* names stay on the upstream packages.
  *
  * Source on develop stays @medusajs/* so upstream merges stay merges.
  * Run this only inside the publish workflow. Do not commit the result.
  */
 import fs from "node:fs"
 import path from "node:path"
+import { paglyPublishPackages, publishedName } from "./pagly-publish-packages.mjs"
 
 const root = path.resolve(import.meta.dirname, "..")
-const scriptPath = path.resolve(import.meta.filename)
-const skipDirs = new Set([
-  "node_modules",
-  ".git",
-  ".yarn",
-  "dist",
-  "coverage",
-  "www",
-  ".turbo",
-  "build",
-])
+const repoUrl = "https://github.com/Pagly-Dev/medusa-core.git"
+const skipDirs = new Set(["node_modules", "dist", "coverage", ".turbo", "build"])
 const textExtensions = new Set([
   ".ts",
   ".tsx",
@@ -38,7 +31,68 @@ const textExtensions = new Set([
   ".txt",
 ])
 
-const repoUrl = "https://github.com/Pagly-Dev/medusa-core.git"
+const sourceNames = paglyPublishPackages.map((pkg) => pkg.name)
+const namePattern = new RegExp(
+  `(?:${sourceNames
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|")})(?![-\\w])`,
+  "g"
+)
+
+function toPublished(name) {
+  return sourceNames.includes(name) ? publishedName(name) : name
+}
+
+function rewriteSpecifiers(contents) {
+  return contents.replace(namePattern, (name) => publishedName(name))
+}
+
+function rewritePackageJson(file) {
+  const pkg = JSON.parse(fs.readFileSync(file, "utf8"))
+  const published = publishedName(pkg.name)
+  pkg.name = published
+
+  for (const field of [
+    "dependencies",
+    "devDependencies",
+    "peerDependencies",
+    "optionalDependencies",
+  ]) {
+    if (!pkg[field]) {
+      continue
+    }
+    const next = {}
+    for (const [key, value] of Object.entries(pkg[field])) {
+      next[toPublished(key)] = value
+    }
+    pkg[field] = next
+  }
+
+  for (const [key, value] of Object.entries(pkg.devDependencies ?? {})) {
+    if (!key.startsWith("@pagly/")) {
+      continue
+    }
+    pkg.dependencies = pkg.dependencies ?? {}
+    if (!pkg.dependencies[key]) {
+      pkg.dependencies[key] = value
+    }
+  }
+
+  if (pkg.repository && typeof pkg.repository === "object") {
+    pkg.repository.url = repoUrl
+  }
+
+  pkg.publishConfig = {
+    ...(pkg.publishConfig ?? {}),
+    access: "public",
+  }
+  delete pkg.publishConfig.provenance
+
+  fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`)
+  return `${published}@${pkg.version}`
+}
 
 function walk(dir, files) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -54,111 +108,58 @@ function walk(dir, files) {
   }
 }
 
-function rewriteText(contents) {
-  return contents.replaceAll("@medusajs/", "@pagly/")
-}
-
-function rewritePackageJson(file) {
-  const pkg = JSON.parse(fs.readFileSync(file, "utf8"))
-  if (pkg.name === "create-medusa-app") {
-    pkg.name = "@pagly/create-medusa-app"
-  }
-
-  for (const field of [
-    "dependencies",
-    "devDependencies",
-    "peerDependencies",
-    "optionalDependencies",
-    "resolutions",
-  ]) {
-    if (!pkg[field]) {
+function rewriteTree(directory) {
+  const files = []
+  walk(directory, files)
+  let rewritten = 0
+  for (const file of files) {
+    if (path.basename(file) === "package.json") {
       continue
     }
-    const next = {}
-    for (const [key, value] of Object.entries(pkg[field])) {
-      const name = key === "create-medusa-app" ? "@pagly/create-medusa-app" : key
-      next[name] = value
+    if (!textExtensions.has(path.extname(file))) {
+      continue
     }
-    pkg[field] = next
-  }
-
-  if (pkg.repository && typeof pkg.repository === "object" && typeof pkg.repository.url === "string") {
-    if (pkg.repository.url.includes("github.com/medusajs/medusa")) {
-      pkg.repository.url = repoUrl
+    const contents = fs.readFileSync(file)
+    if (contents.includes(0)) {
+      continue
+    }
+    const text = contents.toString("utf8")
+    const next = rewriteSpecifiers(text)
+    if (next !== text) {
+      fs.writeFileSync(file, next)
+      rewritten += 1
     }
   }
-
-  if (!pkg.private && typeof pkg.name === "string" && pkg.name.startsWith("@pagly/")) {
-    pkg.publishConfig = {
-      ...(pkg.publishConfig ?? {}),
-      access: "public",
-    }
-    delete pkg.publishConfig.provenance
-  }
-
-  fs.writeFileSync(file, `${JSON.stringify(pkg, null, 2)}\n`)
-  return pkg
+  return rewritten
 }
 
-function rewriteLockfile(file) {
+function rewriteLockfile() {
+  const file = path.join(root, "yarn.lock")
   const contents = fs.readFileSync(file, "utf8")
-  const next = contents
-    .replaceAll("@medusajs/", "@pagly/")
-    .replaceAll(
-      '"create-medusa-app@workspace:',
-      '"@pagly/create-medusa-app@workspace:'
-    )
+  const next = contents.replace(namePattern, (name) => publishedName(name))
   if (next !== contents) {
     fs.writeFileSync(file, next)
   }
 }
 
-const files = []
-walk(root, files)
-
+const published = []
 let rewritten = 0
-const publishable = []
 
-for (const file of files) {
-  if (file === scriptPath) {
-    continue
+for (const entry of paglyPublishPackages) {
+  const directory = path.join(root, entry.directory)
+  const manifest = path.join(directory, "package.json")
+  const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"))
+  if (pkg.name !== entry.name) {
+    console.error(`${entry.directory} is ${pkg.name}, expected ${entry.name}`)
+    process.exit(1)
   }
-  if (path.basename(file) === "yarn.lock") {
-    rewriteLockfile(file)
-    rewritten += 1
-    continue
-  }
-  if (!textExtensions.has(path.extname(file))) {
-    continue
-  }
-
-  const contents = fs.readFileSync(file)
-  if (contents.includes(0)) {
-    continue
-  }
-  const text = contents.toString("utf8")
-  const next = rewriteText(text)
-  if (next !== text) {
-    fs.writeFileSync(file, next)
-    rewritten += 1
-  }
-
-  if (path.basename(file) === "package.json") {
-    const pkg = rewritePackageJson(file)
-    if (!pkg.private && typeof pkg.name === "string" && pkg.name.startsWith("@pagly/")) {
-      publishable.push(`${pkg.name}@${pkg.version}`)
-    }
-  }
+  rewritten += rewriteTree(directory)
+  published.push(rewritePackageJson(manifest))
 }
 
-publishable.sort()
-console.log(`Rewrote ${rewritten} files`)
-console.log(`Publishable packages (${publishable.length})`)
-for (const name of publishable) {
+rewriteLockfile()
+
+console.log(`Rewrote ${rewritten} files in ${paglyPublishPackages.length} predefined packages`)
+for (const name of published) {
   console.log(`  ${name}`)
-}
-
-if (publishable.length === 0) {
-  console.error("No @pagly packages were prepared")
-  process.exit(1)
 }

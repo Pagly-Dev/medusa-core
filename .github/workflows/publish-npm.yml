@@ -35,9 +35,8 @@ jobs:
       - name: Build
         run: yarn build
 
-      - name: Publish to npm
-        run: yarn changeset publish --access public
+      - name: Publish predefined packages
+        run: node scripts/publish-pagly-packages.mjs
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
