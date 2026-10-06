@@ -1,6 +1,8 @@
 export enum PromotionType {
   STANDARD = "standard",
   BUYGET = "buyget",
+  // Pagly: bank promotions are a separate admin type and are not applied at checkout yet.
+  BANK = "bank",
 }
 
 export enum PromotionStatus {

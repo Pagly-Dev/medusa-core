@@ -49,6 +49,10 @@ export interface AdminGetPromotionsParams
    */
   deleted_at?: OperatorMap<string>
   /**
+   * Filter by the promotion's type.
+   */
+  type?: PromotionTypeValues | PromotionTypeValues[]
+  /**
    * An array of filters to apply on the entity, where each item in the array is joined with an "and" condition.
    */
   $and?: AdminGetPromotionsParams[]

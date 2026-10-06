@@ -869,6 +869,15 @@ export default class PromotionModuleService
         continue
       }
 
+      // Pagly: a bank promotion applies only after checkout adds its code.
+      // Automatic bank promotions stay out until a BIN match does that.
+      if (
+        promotion.type === PromotionType.BANK &&
+        !promotionCodeSet.has(promotion.code!)
+      ) {
+        continue
+      }
+
       const {
         application_method: applicationMethod,
         rules: promotionRules = [],
@@ -952,7 +961,11 @@ export default class PromotionModuleService
           )
 
         computedActions.push(...computedActionsForItems)
-      } else if (promotion.type === PromotionType.STANDARD) {
+      } else if (
+        promotion.type === PromotionType.STANDARD ||
+        // Pagly: an applied bank code discounts the same way as a standard promotion.
+        promotion.type === PromotionType.BANK
+      ) {
         const isTargetOrder =
           applicationMethod.target_type === ApplicationMethodTargetType.ORDER
         const isTargetItems =
@@ -964,6 +977,18 @@ export default class PromotionModuleService
           ? ApplicationMethodAllocation.ACROSS
           : undefined
 
+        // Pagly: a bank promotion's per-purchase cap lives in metadata. A cart in another currency gets no bank discount.
+        const bankCap =
+          promotion.type === PromotionType.BANK
+            ? readBankCap(promotion.metadata)
+            : null
+        if (
+          bankCap &&
+          bankCap.currency_code !== applicationContext.currency_code
+        ) {
+          continue
+        }
+
         if (isTargetOrder || isTargetItems) {
           const computedActionsForItems =
             ComputeActionUtils.getComputedActionsForItems(
@@ -972,6 +997,14 @@ export default class PromotionModuleService
               methodIdPromoValueMap,
               allocationOverride
             )
+
+          if (bankCap) {
+            capItemActions(
+              computedActionsForItems,
+              bankCap.max_amount,
+              methodIdPromoValueMap
+            )
+          }
 
           computedActions.push(...computedActionsForItems)
         }
@@ -2105,5 +2138,52 @@ export default class PromotionModuleService
     )
 
     return promotionsToRemove.map((promo) => promo.id)
+  }
+}
+
+// Pagly: @pagly/storefront writes bank_max_amount and bank_currency_code on bank promotions that have a cap.
+function readBankCap(
+  metadata: unknown
+): { max_amount: number; currency_code: string } | null {
+  const data = (metadata ?? {}) as Record<string, unknown>
+  const maxAmount = Number(data.bank_max_amount)
+  const currencyCode = data.bank_currency_code
+  if (
+    !Number.isFinite(maxAmount) ||
+    maxAmount <= 0 ||
+    typeof currencyCode !== "string"
+  ) {
+    return null
+  }
+  return { max_amount: maxAmount, currency_code: currencyCode }
+}
+
+// Pagly: scales item adjustments down so their sum does not exceed the cap.
+function capItemActions(
+  actions: PromotionTypes.ComputeActions[],
+  maxAmount: number,
+  appliedPromotionsMap: Map<string, number>
+) {
+  const adjustments = actions.filter(
+    (action): action is PromotionTypes.AddItemAdjustmentAction =>
+      action.action === ComputedActions.ADD_ITEM_ADJUSTMENT
+  )
+  const total = adjustments.reduce(
+    (sum, action) => MathBN.add(sum, action.amount),
+    MathBN.convert(0)
+  )
+  if (MathBN.lte(total, maxAmount)) {
+    return
+  }
+
+  const ratio = MathBN.div(maxAmount, total)
+  for (const action of adjustments) {
+    const capped = MathBN.mult(action.amount, ratio)
+    const applied = appliedPromotionsMap.get(action.item_id) ?? 0
+    appliedPromotionsMap.set(
+      action.item_id,
+      MathBN.sub(applied, MathBN.sub(action.amount, capped)) as unknown as number
+    )
+    action.amount = capped
   }
 }

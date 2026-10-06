@@ -31,7 +31,17 @@ export async function getViteConfig(
     root,
     base: options.path,
     resolve: {
-      dedupe: ["react", "react-dom"],
+      dedupe: [
+        "react",
+        "react-dom",
+        // Pagly: the plugin resolves these from the repo root while the dashboard prebundle inlines the copies under medusa-core. One copy keeps Link on the admin router.
+        "react-router",
+        "react-router-dom",
+        "react-i18next",
+        "i18next",
+        "@tanstack/react-query",
+        "@tanstack/query-core",
+      ],
     },
     build: {
       emptyOutDir: true,

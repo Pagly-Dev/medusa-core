@@ -12,7 +12,7 @@ import { CreatePromotionRuleDTO, PromotionRuleDTO } from "./promotion-rule"
 /**
  * The promotion's possible types.
  */
-export type PromotionTypeValues = "standard" | "buyget"
+export type PromotionTypeValues = "standard" | "buyget" | "bank"
 
 /**
  * The promotion's possible types.
@@ -43,6 +43,7 @@ export interface PromotionDTO {
    *
    * - `standard` indicates that a promotion is a standard one applied with conditions.
    * - `buyget` indicates that a promotion is a "Buy X get Y" promotion.
+   * - `bank` indicates a bank promotion edited outside this form. It is not applied at checkout yet.
    *
    */
   type?: PromotionTypeValues
@@ -116,6 +117,7 @@ export interface CreatePromotionDTO {
    *
    * - `standard` indicates that a promotion is a standard one applied with conditions.
    * - `buyget` indicates that a promotion is a "Buy X get Y" promotion.
+   * - `bank` indicates a bank promotion edited outside this form. It is not applied at checkout yet.
    *
    */
   type: PromotionTypeValues
