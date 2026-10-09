@@ -256,12 +256,6 @@ const useCoreRoutes = (): Omit<INavItem, "pathname">[] => {
       label: t("priceLists.domain"),
       to: "/price-lists",
     },
-    // Pagly: merchants need one place to see and open their storefront, the way Shopify surfaces "Online Store".
-    {
-      icon: <BuildingStorefront />,
-      label: t("onlineStore.domain"),
-      to: "/online-store",
-    },
   ]
 }
 
