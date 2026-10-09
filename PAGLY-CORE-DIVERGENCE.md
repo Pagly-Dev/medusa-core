@@ -47,6 +47,7 @@ Leave a one-line marker at the edit site:
 | `packages/admin/dashboard/src/routes/promotions/promotion-detail/promotion-detail.tsx` | When `type` is `bank`, the page shows a notice and a link to `/bank-promotions/:id` instead of the generic editor. | The generic editor cannot show bank, card, days, or the per-transaction cap. | none | Upstream can hand a promotion type off to an extension page. | 2026-10-05 |
 | `packages/admin/dashboard/src/i18n/translations/en.json`, `es.json`, `$schema.json` | Added `promotions.bank.notice`. | Copy for the notice on a bank promotion opened from the standard detail URL, in English and Spanish. | none | n/a. Additive keys. | 2026-10-05 |
 | `packages/medusa/src/api/store/carts/query-config.ts` | Store cart responses include `promotions.type`. | The storefront hides a bank promotion's internal code and still shows the discount amount. | none | The store cart already returns promotion type. | 2026-10-05 |
+| `packages/admin/dashboard/src/components/layout/settings-layout/settings-layout.tsx` | Added `GENERAL_EXTENSION_PATHS` (`/settings/pagos`). Settings extension routes on that list render in the General section right after Store, and are left out of Extensions. | Payments is store setup, not an add-on, so merchants look for it under General. `defineRouteConfig` has no option to place a settings route in a core section. The entry id is unchanged, so saved sidebar preferences still apply. | none | Upstream lets a plugin settings route choose its sidebar section. | 2026-10-08 |
 
 ## Bringing in an upstream release
 
