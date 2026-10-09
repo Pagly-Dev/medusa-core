@@ -1,5 +1,7 @@
 import { CORE_LAYOUT_IDS } from "@medusajs/admin-shared"
-import { useLoaderData, useParams } from "react-router-dom"
+import { Button, Container, Heading, Text } from "@medusajs/ui"
+import { useTranslation } from "react-i18next"
+import { Link, useLoaderData, useParams } from "react-router-dom"
 
 import { TwoColumnPageSkeleton } from "../../../components/common/skeleton"
 import { LayoutComposer, detailPageDefaultEntries } from "../../../components/layout-composer"
@@ -21,6 +23,7 @@ export type ExtendedPromotionRule = Omit<AdminPromotionRule, "values"> & {
 }
 
 export const PromotionDetail = () => {
+  const { t } = useTranslation()
   const initialData = useLoaderData() as Awaited<
     ReturnType<typeof promotionLoader>
   >
@@ -50,6 +53,25 @@ export const PromotionDetail = () => {
   if (isLoading || !promotion) {
     return (
       <TwoColumnPageSkeleton mainSections={3} sidebarSections={1} showJSON />
+    )
+  }
+
+  // Pagly: a bank promotion is edited on its own page, not in this form.
+  if (promotion.type === "bank") {
+    return (
+      <Container className="divide-y p-0">
+        <div className="flex flex-col items-start gap-y-2 px-6 py-4">
+          <Heading>{t("promotions.bank.notice.heading")}</Heading>
+          <Text size="small" className="text-ui-fg-subtle">
+            {t("promotions.bank.notice.description")}
+          </Text>
+          <Button size="small" variant="secondary" asChild>
+            <Link to={`/bank-promotions/${promotion.id}`}>
+              {t("promotions.bank.notice.action")}
+            </Link>
+          </Button>
+        </div>
+      </Container>
     )
   }
 
