@@ -1,0 +1,42 @@
+name: Publish Pagly npm packages
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-pagly-npm
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          # .nvmrc and the package engines are Node 22.
+          node-version: "22"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Rewrite published names to @pagly
+        run: node scripts/prepare-pagly-npm-publish.mjs
+
+      - name: Install
+        run: yarn install --no-immutable
+
+      - name: Build
+        run: yarn build
+
+      - name: Publish predefined packages
+        run: node scripts/publish-pagly-packages.mjs
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
