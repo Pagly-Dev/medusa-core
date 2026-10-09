@@ -182,13 +182,28 @@ const toNavEntries = (items: INavItem[]) =>
     </LayoutComposer.Entry>
   ))
 
+// Pagly: plugin settings pages that merchants treat as store setup (Pagos) render under General, not Extensions.
+const GENERAL_EXTENSION_PATHS = new Set(["/settings/pagos"])
+
 const SettingsSidebar = () => {
   const { getMenu } = useExtension()
 
-  const routes = useSettingRoutes()
+  const coreGeneralRoutes = useSettingRoutes()
   const developerRoutes = useDeveloperRoutes()
   const myAccountRoutes = useMyAccountRoutes()
-  const extensionRoutes = getMenu("settingsExtensions")
+  const allExtensionRoutes = getMenu("settingsExtensions")
+
+  const generalExtensionRoutes = allExtensionRoutes.filter((route) =>
+    GENERAL_EXTENSION_PATHS.has(route.to)
+  )
+  const extensionRoutes = allExtensionRoutes.filter(
+    (route) => !GENERAL_EXTENSION_PATHS.has(route.to)
+  )
+  const routes = [
+    ...coreGeneralRoutes.slice(0, 1),
+    ...generalExtensionRoutes,
+    ...coreGeneralRoutes.slice(1),
+  ]
 
   return (
     <aside className="relative flex flex-1 flex-col justify-between overflow-y-auto">
