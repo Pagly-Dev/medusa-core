@@ -38,6 +38,10 @@ export const AdminGetPromotionsParamsFields = z.object({
   created_at: createOperatorMap().optional(),
   updated_at: createOperatorMap().optional(),
   deleted_at: createOperatorMap().optional(),
+  // Pagly: the promotions list asks for standard and buyget only, so bank rows stay on their own page.
+  type: z
+    .union([z.nativeEnum(PromotionType), z.array(z.nativeEnum(PromotionType))])
+    .optional(),
 })
 
 export type AdminGetPromotionsParamsType = z.infer<

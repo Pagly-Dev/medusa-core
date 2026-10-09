@@ -7,6 +7,8 @@ import { queryClient } from "../../../lib/query-client"
 const params = {
   limit: 20,
   offset: 0,
+  // Pagly: bank promotions are listed under Bank promotions, not here.
+  type: ["standard", "buyget"] as HttpTypes.AdminGetPromotionsParams["type"],
 }
 
 const promotionsListQuery = () => ({

@@ -39,6 +39,8 @@ export const defaultStoreCartFields = [
   "sales_channel_id",
   "promotions.id",
   "promotions.code",
+  // Pagly: the storefront uses type to hide a bank promotion's internal code.
+  "promotions.type",
   "promotions.is_automatic",
   "promotions.is_tax_inclusive",
   "promotions.application_method.value",

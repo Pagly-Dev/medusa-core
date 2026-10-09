@@ -521,7 +521,8 @@
           "nullable": false,
           "enumItems": [
             "standard",
-            "buyget"
+            "buyget",
+            "bank"
           ],
           "mappedType": "enum"
         },

@@ -25,7 +25,11 @@ export const PromotionListTable = () => {
 
   const { searchParams, raw } = usePromotionTableQuery({ pageSize: PAGE_SIZE })
   const { promotions, count, isLoading, isError, error } = usePromotions(
-    { ...searchParams },
+    {
+      ...searchParams,
+      // Pagly: bank promotions are listed under Bank promotions, not here.
+      type: ["standard", "buyget"],
+    },
     {
       initialData,
       placeholderData: keepPreviousData,

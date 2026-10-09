@@ -30,6 +30,9 @@ export async function plugin(options: PluginOptions) {
     "@medusajs/js-sdk",
     "@medusajs/admin-sdk",
     "@tanstack/react-query",
+    // Pagly: the dashboard already provides these. Bundling a second copy makes Tooltip and other UI context throw.
+    "@medusajs/ui",
+    "@medusajs/icons",
   ])
 
   const outDir = path.resolve(options.root, options.outDir, "src/admin")

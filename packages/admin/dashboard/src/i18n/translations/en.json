@@ -2215,6 +2215,13 @@
   },
   "promotions": {
     "domain": "Promotions",
+    "bank": {
+      "notice": {
+        "heading": "Bank promotion",
+        "description": "This promotion is edited in Bank promotions.",
+        "action": "Open bank promotion"
+      }
+    },
     "list": {
       "empty": {
         "heading": "No promotions",
